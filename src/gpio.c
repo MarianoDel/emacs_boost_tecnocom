@@ -89,7 +89,8 @@ void GPIO_Config (void)
 
     temp = GPIOB->MODER;	//2 bits por pin
     temp &= 0xFFFFF33F;		//PB3 input; PB5 output
-    temp |= 0x00000400;
+    // temp |= 0x00000400;        //PB5 output
+    temp |= 0x00000800;        //PB5 alternative    
     GPIOB->MODER = temp;
 
     temp = GPIOB->OTYPER;	//1 bit por pin

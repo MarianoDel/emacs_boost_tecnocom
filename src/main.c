@@ -96,80 +96,27 @@ int main(void)
     // }
     //fin prueba led y wait
 
-    //prueba jumper y led
-    CTRL_BOOST_ON;
+    //prueba modulo adc.c tim.c e int adc
+    TIM_3_Init();
+    Update_TIM3_CH2 (25);
+
+    AdcConfig();
+    ADC1->CR |= ADC_CR_ADSTART;
+    
     while (1)
     {
-        if (JUMPER_NO_GEN)
-            LED_ON;
-        else
+        if (seq_ready)
+        {
+            seq_ready = 0;
+            // if (LED)
+                // LED_OFF;
+            // else
+                // LED_ON;
             LED_OFF;
-
-        // if (CTRL_BOOST)
-        // {
-        //     CTRL_BOOST_OFF;
-        //     LED_OFF;
-        // }
-        // else
-        // {
-        //     CTRL_BOOST_ON;
-        //     LED_ON;
-        // }
-        // Wait_ms(5000);
-    }
-    //fin prueba jumper y led
-
-    //prueba relay y led
-    // while (1)
-    // {
-    //     if (RELAY)
-    //     {
-    //         RELAY_OFF;
-    //         LED_OFF;
-    //     }
-    //     else
-    //     {
-    //         LED_ON;
-    //         RELAY_ON;
-    //     }
-
-    //     Wait_ms(5000);
-        
-    // }
-    //fin prueba realy y led
-
-    //PRUEBA LED Y BUZZER
-    // while (1)
-    // {
-    //     if (BUZZER)
-    //     {
-    //         LED_OFF;
-    //         BUZZER_OFF;
-    //     }
-    //     else
-    //     {
-    //         LED_ON;
-    //         BUZZER_ON;
-    //     }
-    //     Wait_ms(200);
-
-    //     // LED_ON;
-    //     // BUZZER_ON;
-    //     // Wait_ms(150);
-    //     // LED_OFF;
-    //     // BUZZER_OFF;
-    //     // Wait_ms(2000);
-    // }
-    //FIN PRUEBA LED Y BUZZER
-
-
+        }
+    }               
+    //fin prueba modulo adc.c tim.c e int adc
     
-    // //prueba modulo signals.c comm.c tim.c adc.c
-    // TIM_3_Init();
-    // Update_TIM3_CH1(0);
-    // Update_TIM3_CH2(0);
-    // Update_TIM3_CH3(0);
-    // Update_TIM3_CH4(0);
 
     // AdcConfig();
     // ADC1->CR |= ADC_CR_ADSTART;

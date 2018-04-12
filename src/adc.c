@@ -79,8 +79,8 @@ void AdcConfig (void)
     //tengo que hacer 4 muestreos, voy a hacer que el tiempo de los 4 sean mayor a 1 ciclo de TIM3
     //y menor a 2 ciclos
     //set sampling time
-    ADC1->SMPR |= ADC_SampleTime_71_5Cycles;
-    // ADC1->SMPR |= ADC_SampleTime_41_5Cycles;
+    // ADC1->SMPR |= ADC_SampleTime_71_5Cycles;
+    ADC1->SMPR |= ADC_SampleTime_41_5Cycles;
     // ADC1->SMPR |= ADC_SampleTime_28_5Cycles;
     //ADC1->SMPR |= ADC_SampleTime_7_5Cycles;
     //las dos int (usar DMA?) y pierde el valor intermedio
@@ -88,7 +88,7 @@ void AdcConfig (void)
 
 #ifdef ADC_WITH_INT
     //set channel selection
-    ADC1->CHSELR |= ADC_Channel_0 | ADC_Channel_1 | ADC_Channel_2 | ADC_Channel_3;    
+    ADC1->CHSELR |= ADC_Channel_0 | ADC_Channel_1 | ADC_Channel_2;    
 
     //set interrupts
     ADC1->IER |= ADC_IT_EOC;
@@ -116,9 +116,9 @@ void ADC1_COMP_IRQHandler (void)
 {
     if (ADC1->ISR & ADC_IT_EOC)
     {
-        if (ADC1->ISR & ADC_IT_EOSEQ)	//seguro que es channel4 en posicion 3
+        if (ADC1->ISR & ADC_IT_EOSEQ)	//seguro que es channel2 en posicion 2
         {
-            p_channel = &adc_ch[3];
+            p_channel = &adc_ch[2];
             *p_channel = ADC1->DR;
             p_channel = &adc_ch[0];
             seq_ready = 1;
@@ -127,13 +127,13 @@ void ADC1_COMP_IRQHandler (void)
             //     LED_OFF;
             // else
             //     LED_ON;
-
-// #endif            
         }
         else
         {
+            LED_ON;
+
             *p_channel = ADC1->DR;		//
-            if (p_channel < &adc_ch[3])
+            if (p_channel < &adc_ch[2])
                 p_channel++;
         }
 
