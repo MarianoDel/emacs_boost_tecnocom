@@ -96,6 +96,9 @@
 //GPIOB pin4
 
 //GPIOB pin5     TIM3_CH2
+#define CTRL_BOOST ((GPIOB->ODR & 0x0020) != 0)
+#define CTRL_BOOST_ON GPIOB->BSRR = 0x00000020     //esto es estado alto Hi-z
+#define CTRL_BOOST_OFF GPIOB->BSRR = 0x00200000    //esto es estado bajo 0V
 
 //GPIOB pin6
 //GPIOB pin7    NC

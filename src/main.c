@@ -85,17 +85,59 @@ int main(void)
     }
 
     //prueba led y wait
+    // while (1)
+    // {
+    //     if (LED)
+    //         LED_OFF;
+    //     else
+    //         LED_ON;
+
+    //     Wait_ms(1000);
+    // }
+    //fin prueba led y wait
+
+    //prueba jumper y led
+    CTRL_BOOST_ON;
     while (1)
     {
-        if (LED)
-            LED_OFF;
-        else
+        if (JUMPER_NO_GEN)
             LED_ON;
+        else
+            LED_OFF;
 
-        Wait_ms(1000);
+        // if (CTRL_BOOST)
+        // {
+        //     CTRL_BOOST_OFF;
+        //     LED_OFF;
+        // }
+        // else
+        // {
+        //     CTRL_BOOST_ON;
+        //     LED_ON;
+        // }
+        // Wait_ms(5000);
     }
-    //fin prueba led y wait
-    
+    //fin prueba jumper y led
+
+    //prueba relay y led
+    // while (1)
+    // {
+    //     if (RELAY)
+    //     {
+    //         RELAY_OFF;
+    //         LED_OFF;
+    //     }
+    //     else
+    //     {
+    //         LED_ON;
+    //         RELAY_ON;
+    //     }
+
+    //     Wait_ms(5000);
+        
+    // }
+    //fin prueba realy y led
+
     //PRUEBA LED Y BUZZER
     // while (1)
     // {
