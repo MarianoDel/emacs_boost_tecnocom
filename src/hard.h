@@ -103,6 +103,17 @@
 //GPIOB pin6
 //GPIOB pin7    NC
 
+//ESTADOS DEL PROGRAMA PRINCIPAL
+typedef enum {
+    INIT = 0,
+    STAND_BY,
+    TO_GEN,
+    GENERATING,
+    TO_STAND_BY,
+    LOW_BAT,
+    OVERCURRENT
+} main_state_t;
+          
 
 //ESTADOS DEL LED
 typedef enum
@@ -118,13 +129,17 @@ typedef enum
 #define LED_NO_BLINKING               0
 #define LED_STANDBY                   1
 #define LED_GENERATING                2
+#define LED_LOW_VOLTAGE               3
+#define LED_PROTECTED                 4
 #define LED_VIN_ERROR                 5
 #define LED_OVERCURRENT_ERROR         6
 
-#define Vin_Sense      adc_ch[0]
+//---- ADC configurations ----//
+#define ADC_CH_QUANTITY        4
+#define Vbatt_Sense      adc_ch[0]
 #define Boost_Sense    adc_ch[1]
 #define Vout_Sense     adc_ch[2]
-
+#define Vmains_Sense    adc_ch[3]
 
 /* Module Functions ------------------------------------------------------------*/
 void ChangeLed (unsigned char);
