@@ -48,7 +48,9 @@ short ez1 = 0;
 short ez2 = 0;
 
 #define IN_6V        335
+#define IN_10V       559
 #define IN_11V       614
+#define IN_12V       670
 #define IN_16V       894
 
 #define BAT_9_5V     531
@@ -169,11 +171,11 @@ int main(void)
 
             case STAND_BY:    //tengo 220V
                 // if (mains_filtered < IN_16V)    //tengo baja tension de 220, me paso a bateria
-                if (mains_filtered < IN_6V)    //tengo baja tension de 220, me paso a bateria
+                if (mains_filtered < IN_11V)    //tengo baja tension de 220, me paso a bateria
                 {
                     main_state = TO_GEN;
                     RELAY_OFF;
-                    timer_standby = 500;
+                    timer_standby = 100;
                 }
                 break;
 
@@ -208,8 +210,8 @@ int main(void)
                                 if (d < 0)
                                     d = 0;
 
-                                if (d > DUTY_80_PERCENT)	//no pasar del 90%
-                                    d = DUTY_80_PERCENT;
+                                if (d > DUTY_90_PERCENT)	//no pasar del 90%
+                                    d = DUTY_90_PERCENT;
 
                                 Update_TIM3_CH2 (d);
                             }
@@ -237,7 +239,7 @@ int main(void)
                 }
 
                 //reviso si vuelven los 220
-                if (mains_filtered > IN_11V)
+                if (mains_filtered > IN_12V)
                 {
                     //dejo de generar y vuelvo a 220
                     Update_TIM3_CH2(0);
