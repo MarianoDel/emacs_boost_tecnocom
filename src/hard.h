@@ -12,6 +12,39 @@
 
 
 //-- Defines For Configuration -------------------
+#define IN_6V        335
+#define IN_10V       559
+#define IN_11V       614
+#define IN_12V       670
+#define IN_16V       894
+
+#define BAT_9_5V     531
+#define BAT_11_5V    643
+
+#define OUT_69V      628
+#define OUT_75V      683
+#define OUT_80V      747    //ajustada 30-9-19 tiene 82V salida
+#define OUT_90V      840
+
+#define CURR_25MA    24
+#define CURR_30MA    33
+#define CURR_49MA    44
+#define CURR_50MA    45
+#define CURR_60MA    54
+#define CURR_65MA    59
+#define CURR_70MA    63
+
+// where to go?
+#define VOUT_SETPOINT    OUT_75V
+#define VOUT_MAX_THRESHOLD    OUT_90V
+#define VOUT_MIN_THRESHOLD    OUT_69V
+#define UNDERSAMPLING_TICKS    6
+
+#define IOUT_SETPOINT    CURR_60MA
+#define MAINS_TO_RECONNECT    IN_12V
+#define MAINS_MIN_VALID_VOLTAGE    IN_11V
+#define BATTERY_TO_RECONNECT    BAT_11_5V
+
 //---- Configuration for Hardware Versions -------
 #define HARDWARE_VERSION_1_0
 
@@ -111,9 +144,18 @@ typedef enum {
     GENERATING,
     TO_STAND_BY,
     LOW_BAT,
-    OVERCURRENT
+    OVERCURRENT,
+    OVERVOLTAGE
+    
 } main_state_t;
-          
+
+//ESTADOS DEL BOOST
+typedef enum {
+    VOLTAGE_MODE = 0,
+    CURRENT_MODE
+
+} boost_state_t;
+
 
 //ESTADOS DEL LED
 typedef enum
@@ -133,6 +175,7 @@ typedef enum
 #define LED_PROTECTED                 4
 #define LED_VIN_ERROR                 5
 #define LED_OVERCURRENT_ERROR         6
+#define LED_OVERVOLTAGE             7
 
 
 /* Module Functions ------------------------------------------------------------*/

@@ -26,7 +26,7 @@
 #endif
 //----------- End of ADC Configurations --------------//
 
-#define Vbatt_Sense    adc_ch[0]
+#define VBatt_Sense    adc_ch[0]
 #define Boost_Sense    adc_ch[1]
 #define Vout_Sense    adc_ch[2]
 #define Vmains_Sense    adc_ch[3]

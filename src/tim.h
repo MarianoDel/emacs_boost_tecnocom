@@ -19,13 +19,17 @@
 
 //--- Exported types ---//
 //--- Exported constants ---//
+#define DUTY_NONE		(DUTY_00_PERCENT)
+#define DUTY_FOR_DMAX           (DUTY_90_PERCENT)
+#define DUTY_ALWAYS        (DUTY_100_PERCENT + 1)
+
 #define DUTY_50_PERCENT		500
 #define DUTY_80_PERCENT		800
 #define DUTY_70_PERCENT		700
 #define DUTY_90_PERCENT		900
 #define DUTY_95_PERCENT		950
 #define DUTY_100_PERCENT	1000
-#define DUTY_ALWAYS			(DUTY_100_PERCENT + 1)
+
 
 //--- Exported macro ---//
 #define RCC_TIM1_CLK 		(RCC->APB2ENR & 0x00000800)

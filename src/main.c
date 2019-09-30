@@ -29,7 +29,6 @@
 //--- VARIABLES EXTERNAS ---//
 // ------- Externals del ADC -------
 volatile unsigned short adc_ch [ADC_CHANNEL_QUANTITY];
-volatile unsigned char seq_ready;
 
 // ------- Externals de los timers -------
 volatile unsigned short timer_led = 0;
@@ -39,39 +38,25 @@ volatile unsigned short wait_ms_var = 0;
 
 
 // ------- Definiciones para los filtros -------
-#define SIZEOF_FILTER    8
-#define UNDERSAMPLING_TICKS    5
-unsigned short vmains [SIZEOF_FILTER];
-unsigned short vbatt [SIZEOF_FILTER];
-unsigned short iboost [SIZEOF_FILTER];
-short d = 0;
-short ez1 = 0;
-short ez2 = 0;
 
-#define IN_6V        335
-#define IN_10V       559
-#define IN_11V       614
-#define IN_12V       670
-#define IN_16V       894
 
-#define BAT_9_5V     531
-#define BAT_11_5V    643
+// Globals ---------------------------------------------------------------------
+// for the pid controllers
+pid_data_obj_t voltage_pid;
 
-#define OUT_35V      319
-#define OUT_40V      364
-#define OUT_45V      410
-#define OUT_50V      455
-#define OUT_80V      747    //ajustada 13-4-18
-
-//--- VARIABLES GLOBALES ---//
-
+// for circular filters
+ma16_u16_data_obj_t sense_batt_data_filter;
+ma16_u16_data_obj_t sense_boost_data_filter;
+ma16_u16_data_obj_t sense_mains_data_filter;
 
 // ------- de los timers -------
 
 //--- FUNCIONES DEL MODULO ---//
 void TimingDelay_Decrement(void);
-
-
+unsigned short Control_Voltage_Mode (short, unsigned short);
+unsigned short Control_Current_Mode (short, unsigned short);
+void Set_Control_Voltage_Mode (void);
+void Set_Control_Current_Mode (void);
 
 //-------------------------------------------//
 // @brief  Main program.
@@ -80,22 +65,20 @@ void TimingDelay_Decrement(void);
 //------------------------------------------//
 int main(void)
 {
-    unsigned short i = 0;
     main_state_t main_state = INIT;
     unsigned char protected = 0;
-    unsigned char calc_filters = 0;
     unsigned char undersampling = 0;
-    unsigned short curr_filtered = 0;
-    unsigned short batt_filtered = 0;
-    unsigned short mains_filtered = 0;
+
+    unsigned short sense_curr_filtered = 0;
+    unsigned short sense_batt_filtered = 0;
+    unsigned short sense_mains_filtered = 0;
+    short d = 0;
+
+    boost_state_t boost_state = VOLTAGE_MODE;
         
 
     //GPIO Configuration.
     GPIO_Config();
-
-    //TIM Configuration.
-    // TIM_3_Init();
-    // TIM_14_Init();
 
     //ACTIVAR SYSTICK TIMER
     if (SysTick_Config(48000))
@@ -107,7 +90,7 @@ int main(void)
             else
                 LED_ON;
 
-            for (i = 0; i < 255; i++)
+            for (unsigned char i = 0; i < 255; i++)
             {
                 asm (	"nop \n\t"
                         "nop \n\t"
@@ -116,38 +99,7 @@ int main(void)
         }
     }
 
-    //prueba led y wait
-    // while (1)
-    // {
-    //     if (LED)
-    //         LED_OFF;
-    //     else
-    //         LED_ON;
-
-    //     Wait_ms(1000);
-    // }
-    //fin prueba led y wait
-
-    //prueba modulo adc.c tim.c e int adc
-    // TIM_3_Init();
-    // Update_TIM3_CH2 (25);
-
-    // AdcConfig();
-    // ADC1->CR |= ADC_CR_ADSTART;
-    
-    // while (1)
-    // {
-    //     if (seq_ready)
-    //     {
-    //         seq_ready = 0;
-    //         if (LED)
-    //             LED_OFF;
-    //         else
-    //             LED_ON;
-    //         // LED_OFF;
-    //     }
-    // }               
-    //fin prueba modulo adc.c tim.c e int adc
+    // Timers Configuration
     TIM_3_Init();
     Update_TIM3_CH2 (0);
 
@@ -162,26 +114,43 @@ int main(void)
     RELAY_ON;
 
     timer_standby = 1000;
-        
+
+    //start the circular filters
+    MA16_U16Circular_Reset(&sense_batt_data_filter); 
+    MA16_U16Circular_Reset(&sense_boost_data_filter);
+    MA16_U16Circular_Reset(&sense_mains_data_filter);
+    
+    //start the pid data for controller
+    PID_Flush_Errors(&voltage_pid);
+    Set_Control_Voltage_Mode();
+
     while (1)
     {
-        switch (main_state)
+        //the most work involved is sample by sample
+        if (sequence_ready)
         {
+            sequence_ready_reset;
+
+            //filters
+            sense_batt_filtered = MA16_U16Circular(&sense_batt_data_filter, VBatt_Sense);
+            sense_curr_filtered = MA16_U16Circular(&sense_boost_data_filter, Boost_Sense);
+            sense_mains_filtered = MA16_U16Circular(&sense_mains_data_filter, Vmains_Sense);
+            
+            switch (main_state)
+            {
             case INIT:
                 if (!timer_standby)
-                {
-                    
                     main_state++;
-                }
+
                 break;
 
-            case STAND_BY:    //tengo 220V
-                // if (mains_filtered < IN_16V)    //tengo baja tension de 220, me paso a bateria
-                if (mains_filtered < IN_11V)    //tengo baja tension de 220, me paso a bateria
+            case STAND_BY:
+                //tengo baja tension de 220, me paso a bateria
+                if (sense_mains_filtered < MAINS_MIN_VALID_VOLTAGE)
                 {
                     main_state = TO_GEN;
                     RELAY_OFF;
-                    timer_standby = 100;
+                    timer_standby = 1000;
                 }
                 break;
 
@@ -192,8 +161,7 @@ int main(void)
                     main_state = GENERATING;
                     ChangeLed(LED_GENERATING);
                     d = 0;
-                    ez1 = 0;
-                    ez2 = 0;
+                    PID_Flush_Errors(&voltage_pid);
                 }
                 break;
 
@@ -202,29 +170,42 @@ int main(void)
                 {
                     if (!JUMPER_NO_GEN)
                     {              
-                        // if (seq_ready)
-                        // {
-                        //     seq_ready = 0;
-                        if (sequence_ready)
+                        if (undersampling < (UNDERSAMPLING_TICKS - 1))
+                            undersampling++;
+                        else
                         {
-                            sequence_ready_reset;
-                            if (undersampling < UNDERSAMPLING_TICKS)
-                                undersampling++;
-                            else
+                            switch (boost_state)
                             {
-
-                                // d = PID_roof (OUT_35V, Vout_Sense, d, &ez1, &ez2);
-                                d = PID_roof (OUT_80V, Vout_Sense, d, &ez1, &ez2);
-                                // d = PID_roof (OUT_50V, Vout_Sense, d, &ez1, &ez2);                                
-                                if (d < 0)
-                                    d = 0;
-
-                                if (d > DUTY_90_PERCENT)	//no pasar del 90%
-                                    d = DUTY_90_PERCENT;
+                            case VOLTAGE_MODE:
+                                d = Control_Voltage_Mode (d, Vout_Sense);
 
                                 Update_TIM3_CH2 (d);
+
+                                if (sense_curr_filtered > CURR_70MA)
+                                {
+                                    Set_Control_Current_Mode();
+                                    boost_state = CURRENT_MODE;
+                                }
+                                break;
+
+                            case CURRENT_MODE:
+                                d = Control_Current_Mode (d, sense_curr_filtered);
+
+                                Update_TIM3_CH2 (d);
+
+                                if ((sense_curr_filtered < CURR_25MA) ||
+                                    (Vout_Sense < VOUT_MIN_THRESHOLD))
+                                {
+                                    Set_Control_Voltage_Mode();
+                                    boost_state = VOLTAGE_MODE;
+                                }
+                                break;
+
+                            default:
+                                boost_state = VOLTAGE_MODE;
+                                break;
                             }
-                        }    //cierra sequence
+                        }
                     }    //cierra jumper protected
                     else
                     {
@@ -242,23 +223,21 @@ int main(void)
                         protected = 0;
                         ChangeLed(LED_GENERATING);
                         d = 0;
-                        ez1 = 0;
-                        ez2 = 0;
+                        PID_Flush_Errors(&voltage_pid);
                     }
                 }
 
                 //reviso si vuelven los 220
-                if (mains_filtered > IN_12V)
+                if (sense_mains_filtered > MAINS_TO_RECONNECT)
                 {
                     //dejo de generar y vuelvo a 220
                     Update_TIM3_CH2(0);
-                    ChangeLed(LED_STANDBY);
                     main_state = TO_STAND_BY;
                     timer_standby = 500;
                 }
 
                 //reviso si esta ya muy baja la bateria
-                if (batt_filtered < BAT_9_5V)
+                if (sense_batt_filtered < BAT_9_5V)
                 {
                     Update_TIM3_CH2(0);
                     ChangeLed(LED_LOW_VOLTAGE);
@@ -270,130 +249,124 @@ int main(void)
                 if (!timer_standby)
                 {
                     RELAY_ON;
+                    ChangeLed(LED_STANDBY);
                     main_state = STAND_BY;
+                    timer_standby = 1500;
                 }
                 break;
 
             case LOW_BAT:
-                if (batt_filtered > BAT_11_5V)
+                //si se recupera la bateria vuelvo a generar
+                if (sense_batt_filtered > BATTERY_TO_RECONNECT)
                 {
-                    //si tengo 220 vuelvo al principal
-                    if (mains_filtered > IN_11V)
-                        main_state = TO_STAND_BY;
-                    else
-                        main_state = TO_GEN;
-                }                
+                    timer_standby = 1000;
+                    main_state = TO_GEN;
+                }
+
+                //si tengo 220 voy a stand-by
+                if (sense_mains_filtered > MAINS_TO_RECONNECT)
+                {
+                    ChangeLed(LED_STANDBY);
+                    main_state = TO_STAND_BY;
+                    timer_standby = 500;
+                }
                 break;
 
             case OVERCURRENT:
                 break;
+
+            case OVERVOLTAGE:
+                if (Vout_Sense < VOUT_MIN_THRESHOLD)
+                {
+                    main_state = TO_GEN;
+                }
+                break;
                 
             default:
                 break;
+            }
+        }
+
+        if ((main_state != OVERVOLTAGE) &&
+            (Vout_Sense > VOUT_MAX_THRESHOLD))
+        {
+            d = 0;
+            PID_Flush_Errors(&voltage_pid);
+            Update_TIM3_CH2(0);
+            ChangeLed(LED_OVERVOLTAGE);
         }
         
-        // if (seq_ready)
-        // {
-        //     seq_ready = 0;
-        //     // if (LED)
-        //         // LED_OFF;
-        //     // else
-        //         // LED_ON;
-        //     LED_OFF;
-        // }
-        if (!timer_filters)
-        {
-            vmains[0] = Vmains_Sense;
-            vbatt[0] = Vbatt_Sense;
-            iboost[0] = Boost_Sense;
-            calc_filters = 1;
-            timer_filters = 100;
-        }
-
-        switch (calc_filters)    //distribuyo filtros en varios pasos
-        {
-            case 1:
-                mains_filtered = MAFilter8(vmains);
-                calc_filters++;
-                break;
-
-            case 2:
-                batt_filtered = MAFilter8(vbatt);
-                calc_filters++;
-                break;
-
-            case 3:
-                curr_filtered = MAFilter8(iboost);
-                calc_filters++;
-                break;
-
-            case 4:
-                break;
-        }
-            
         UpdateLed();
-    }               
-
-    // AdcConfig();
-    // ADC1->CR |= ADC_CR_ADSTART;
-    
-    // TIM_14_Init();
-    // UpdateLaserCh1(0);
-    // UpdateLaserCh2(0);
-    // UpdateLaserCh3(0);
-    // UpdateLaserCh4(0);
-
-    // USART1Config();
-
-    
-    // while (1)
-    // {        
-    //     TreatmentManager();
-    //     UpdateCommunications();
-    //     UpdateLed();
-    //     UpdateBuzzer();
-    // }
-    // //fin prueba modulo signals.c comm.c tim.c adc.c
-
-    //prueba modulo adc.c tim.c e int adc
-    // TIM_3_Init();
-    // Update_TIM3_CH1(511);
-    // Update_TIM3_CH2(0);
-    // Update_TIM3_CH3(0);
-    // Update_TIM3_CH4(0);
-
-    // AdcConfig();
-    // ADC1->CR |= ADC_CR_ADSTART;
-    
-    // while (1)
-    // {
-    //     if (seq_ready)
-    //     {
-    //         seq_ready = 0;
-    //         if (LED)
-    //             LED_OFF;
-    //         else
-    //             LED_ON;
-    //     }
-    // }               
-    //fin prueba modulo adc.c tim.c e int adc
-
-
-
-    // Update_TIM3_CH1(511);
-    // Update_TIM3_CH2(511);
-    // Update_TIM3_CH3(511);
-    // Update_TIM3_CH4(511);
-    // while (1);
-    
-
-
-
-
+    }
 
     return 0;
 }
 //--- End of Main ---//
+inline void Set_Control_Voltage_Mode (void)
+{
+    voltage_pid.kp = 32;
+    voltage_pid.ki = 8;
+    voltage_pid.kd = 0;
+}
+
+inline void Set_Control_Current_Mode (void)
+{
+    voltage_pid.kp = 0;
+    voltage_pid.ki = 42;    //necesito error mayor a 3 por definicion en el pwm    
+    voltage_pid.kd = 0;
+}
+
+inline unsigned short Control_Voltage_Mode (short duty, unsigned short meas)
+{
+    voltage_pid.setpoint = VOUT_SETPOINT;
+    voltage_pid.sample = meas;
+    duty = PID(&voltage_pid);
+
+    if (duty > 0)
+    {
+        if (duty > DUTY_FOR_DMAX)	//no pasar del 90%
+        {
+            duty = DUTY_FOR_DMAX;
+            voltage_pid.last_d = DUTY_FOR_DMAX;
+        }                                
+    }
+    else
+    {
+        duty = 0;
+        voltage_pid.last_d = 0;
+    }
+
+    return (unsigned short) duty;
+}
+
+unsigned char current_undersampling = 0;
+inline unsigned short Control_Current_Mode (short duty, unsigned short meas)
+{
+    if (current_undersampling)
+        current_undersampling--;
+    else
+    {
+        current_undersampling = 100;
+        voltage_pid.setpoint = IOUT_SETPOINT;
+        voltage_pid.sample = meas;
+        duty = PID(&voltage_pid);
+
+        if (duty > 0)
+        {
+            if (duty > DUTY_FOR_DMAX)	//no pasar del 90%
+            {
+                duty = DUTY_FOR_DMAX;
+                voltage_pid.last_d = DUTY_FOR_DMAX;
+            }                                
+        }
+        else
+        {
+            duty = 0;
+            voltage_pid.last_d = 0;
+        }
+    }
+    return (unsigned short) duty;
+}
 
 void TimingDelay_Decrement(void)
 {
