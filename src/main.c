@@ -16,6 +16,7 @@
 
 #include "core_cm0.h"
 #include "adc.h"
+#include "dma.h"
 #include "tim.h"
 #include "dsp.h"
 
@@ -27,7 +28,7 @@
 
 //--- VARIABLES EXTERNAS ---//
 // ------- Externals del ADC -------
-volatile unsigned short adc_ch [ADC_CH_QUANTITY];
+volatile unsigned short adc_ch [ADC_CHANNEL_QUANTITY];
 volatile unsigned char seq_ready;
 
 // ------- Externals de los timers -------
@@ -150,8 +151,13 @@ int main(void)
     TIM_3_Init();
     Update_TIM3_CH2 (0);
 
+    //ADC and DMA configuration
     AdcConfig();
+    DMAConfig();
+    DMA1_Channel1->CCR |= DMA_CCR_EN;
     ADC1->CR |= ADC_CR_ADSTART;
+    //end of ADC & DMA
+
     ChangeLed(LED_STANDBY);
     RELAY_ON;
 
@@ -196,9 +202,12 @@ int main(void)
                 {
                     if (!JUMPER_NO_GEN)
                     {              
-                        if (seq_ready)
+                        // if (seq_ready)
+                        // {
+                        //     seq_ready = 0;
+                        if (sequence_ready)
                         {
-                            seq_ready = 0;
+                            sequence_ready_reset;
                             if (undersampling < UNDERSAMPLING_TICKS)
                                 undersampling++;
                             else

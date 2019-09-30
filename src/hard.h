@@ -134,12 +134,6 @@ typedef enum
 #define LED_VIN_ERROR                 5
 #define LED_OVERCURRENT_ERROR         6
 
-//---- ADC configurations ----//
-#define ADC_CH_QUANTITY        4
-#define Vbatt_Sense      adc_ch[0]
-#define Boost_Sense    adc_ch[1]
-#define Vout_Sense     adc_ch[2]
-#define Vmains_Sense    adc_ch[3]
 
 /* Module Functions ------------------------------------------------------------*/
 void ChangeLed (unsigned char);
