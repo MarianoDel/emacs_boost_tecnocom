@@ -48,6 +48,7 @@ pid_data_obj_t voltage_pid;
 ma16_u16_data_obj_t sense_batt_data_filter;
 ma16_u16_data_obj_t sense_boost_data_filter;
 ma16_u16_data_obj_t sense_mains_data_filter;
+ma16_u16_data_obj_t sense_vout_data_filter;
 
 // ------- de los timers -------
 
@@ -72,6 +73,7 @@ int main(void)
     unsigned short sense_curr_filtered = 0;
     unsigned short sense_batt_filtered = 0;
     unsigned short sense_mains_filtered = 0;
+    unsigned short sense_vout_filtered = 0;
     short d = 0;
 
     boost_state_t boost_state = VOLTAGE_MODE;
@@ -119,6 +121,7 @@ int main(void)
     MA16_U16Circular_Reset(&sense_batt_data_filter); 
     MA16_U16Circular_Reset(&sense_boost_data_filter);
     MA16_U16Circular_Reset(&sense_mains_data_filter);
+    MA16_U16Circular_Reset(&sense_vout_data_filter);
     
     //start the pid data for controller
     PID_Flush_Errors(&voltage_pid);
@@ -135,6 +138,7 @@ int main(void)
             sense_batt_filtered = MA16_U16Circular(&sense_batt_data_filter, VBatt_Sense);
             sense_curr_filtered = MA16_U16Circular(&sense_boost_data_filter, Boost_Sense);
             sense_mains_filtered = MA16_U16Circular(&sense_mains_data_filter, Vmains_Sense);
+            sense_vout_filtered = MA16_U16Circular(&sense_vout_data_filter, Vout_Sense);            
             
             switch (main_state)
             {
@@ -146,7 +150,8 @@ int main(void)
 
             case STAND_BY:
                 //tengo baja tension de 220, me paso a bateria
-                if (sense_mains_filtered < MAINS_MIN_VALID_VOLTAGE)
+                if ((sense_mains_filtered < MAINS_MIN_VALID_VOLTAGE) &&
+                    (sense_batt_filtered > BATTERY_TO_RECONNECT))
                 {
                     main_state = TO_GEN;
                     RELAY_OFF;
@@ -189,15 +194,18 @@ int main(void)
                                 break;
 
                             case CURRENT_MODE:
-                                d = Control_Current_Mode (d, sense_curr_filtered);
-
-                                Update_TIM3_CH2 (d);
-
                                 if ((sense_curr_filtered < CURR_25MA) ||
-                                    (Vout_Sense < VOUT_MIN_THRESHOLD))
+                                    (sense_vout_filtered < VOUT_MIN_THRESHOLD) ||
+                                    (sense_vout_filtered > VOUT_SETPOINT))
                                 {
                                     Set_Control_Voltage_Mode();
                                     boost_state = VOLTAGE_MODE;
+                                }
+                                else
+                                {
+                                    d = Control_Current_Mode (d, sense_curr_filtered);
+
+                                    Update_TIM3_CH2 (d);
                                 }
                                 break;
 
@@ -237,7 +245,7 @@ int main(void)
                 }
 
                 //reviso si esta ya muy baja la bateria
-                if (sense_batt_filtered < BAT_9_5V)
+                if (sense_batt_filtered < BATTERY_LOW)
                 {
                     Update_TIM3_CH2(0);
                     ChangeLed(LED_LOW_VOLTAGE);
@@ -276,7 +284,7 @@ int main(void)
                 break;
 
             case OVERVOLTAGE:
-                if (Vout_Sense < VOUT_MIN_THRESHOLD)
+                if (sense_vout_filtered < VOUT_MIN_THRESHOLD)
                 {
                     main_state = TO_GEN;
                 }
@@ -288,7 +296,7 @@ int main(void)
         }
 
         if ((main_state != OVERVOLTAGE) &&
-            (Vout_Sense > VOUT_MAX_THRESHOLD))
+            (sense_vout_filtered > VOUT_MAX_THRESHOLD))
         {
             d = 0;
             PID_Flush_Errors(&voltage_pid);

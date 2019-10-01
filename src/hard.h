@@ -44,6 +44,7 @@
 #define MAINS_TO_RECONNECT    IN_12V
 #define MAINS_MIN_VALID_VOLTAGE    IN_11V
 #define BATTERY_TO_RECONNECT    BAT_11_5V
+#define BATTERY_LOW    BAT_9_5V
 
 //---- Configuration for Hardware Versions -------
 #define HARDWARE_VERSION_1_0
